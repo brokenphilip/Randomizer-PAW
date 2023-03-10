@@ -348,6 +348,73 @@
 				"linux"		"@_ZN13CEconItemViewaSERKS_"
 				"windows"	"\x55\x8B\xEC\x51\x53\x8B\x5D\x08\x56\x8B\xF1\xB1\x20"
 			}
+
+			// For reference: GetDroppedWeaponInRange and CanPickupDroppedWeapon are in tf_player_shared.cpp, rest are in the server tf_player.cpp
+
+			// Search string "enable_misc2_noisemaker" -> only result is the next function
+			// v
+			// void CTFPlayer::UseActionSlotItemPressed( void ) -> right before the searched string is a check != '\0' for the next function
+			// v
+			// bool CTFPlayer::TryToPickupDroppedWeapon()
+			// -> last if, FIRST check is != 0 for the function [1]
+			// -> also in the last if, LAST check is != '\0' for the function [2] (read below)
+			// v
+			// [1] CTFDroppedWeapon* CTFPlayer::GetDroppedWeaponInRange() -> right after the dynamic cast, it checks != 0 for some function, and THEN checks != '\0' for the next function
+			// v
+			// bool CTFPlayer::CanPickupDroppedWeapon( const CTFDroppedWeapon *pWeapon ) -> makesig.py
+
+			"CTFPlayer::CanPickupDroppedWeapon"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9CTFPlayer22CanPickupDroppedWeaponEPK16CTFDroppedWeapon"
+				"windows"	"\x55\x8B\xEC\x53\x8B\x5D\x08\x56\x8B\xF1\x80\xBB\x04\x05\x00\x00\x00"
+			}
+
+			// [2] bool CTFPlayer::PickupWeaponFromOther( CTFDroppedWeapon *pDroppedWeapon ) -> makesig.py
+			"CTFPlayer::PickupWeaponFromOther"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9CTFPlayer21PickupWeaponFromOtherEP16CTFDroppedWeapon"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x56\x8B\x75\x08\x57\x8B\xF9\x81\xC6\xB0\x04\x00\x00"
+			}
+
+			// Search string "tf_dropped_weapon" -> only defined function
+			// v
+			// CTFDroppedWeapon *CTFDroppedWeapon::Create( CTFPlayer *pLastOwner, const Vector &vecOrigin, const QAngle &vecAngles, const char *pszModelName, const CEconItemView *pItem ) -> makesig.py
+			"CTFDroppedWeapon::Create"
+			{
+				"library"	"server"
+				"linux"		"@_ZN16CTFDroppedWeapon6CreateEP9CTFPlayerRK6VectorRK6QAnglePKcPK13CEconItemView"
+				"windows"	"\x55\x8B\xEC\x51\xA1\x2A\x2A\x2A\x2A\x80\xB8\x7A\x09\x00\x00\x00"
+			}
+
+			// Search string "ChargeLevelDegradeThink" -> function with 5 parameters (int*, int*, int*, char, char)
+			// v
+			// void CTFDroppedWeapon::InitDroppedWeapon( CTFPlayer *pPlayer, CTFWeaponBase *pWeapon,  bool bSwap, bool bIsSuicide /*= false*/ ) -> makesig.py
+			"CTFDroppedWeapon::InitDroppedWeapon"
+			{
+				"library"	"server"
+				"linux"		"@_ZN16CTFDroppedWeapon17InitDroppedWeaponEP9CTFPlayerP13CTFWeaponBasebb"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x56\x57\x8B\xF9\x8B\x4D\x08"
+			}
+
+			// Search string "weapon_bone" -> function with 4 parameters (int*, undefined, undefined*, undefined)
+			// v
+			// bool CTFPlayer::CalculateAmmoPackPositionAndAngles( CTFWeaponBase *pWeapon, Vector &vecOrigin, QAngle &vecAngles ) -> makesig.py
+			"CTFPlayer::CalculateAmmoPackPositionAndAngles"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9CTFPlayer34CalculateAmmoPackPositionAndAnglesEP13CTFWeaponBaseR6VectorR6QAngle"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x56\x68\x2A\x2A\x2A\x2A"
+			}
+
+			// the one with "ChargeLevelDegradeThink" (xref string) at the beginning, has 2 dyncasts
+			"CTFDroppedWeapon::InitPickedUpWeapon"
+			{
+				"library"	"server"
+				"linux"		"@_ZN16CTFDroppedWeapon18InitPickedUpWeaponEP9CTFPlayerP13CTFWeaponBase"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x08\xD9\xEE\x53\x56\x57"
+			}
 		}
 		"Offsets"
 		{
@@ -365,6 +432,11 @@
 			{
 				"linux"		"123"
 				"windows"	"122"
+			}
+			"CBaseEntity::GetDefaultItemChargeMeterValue"
+			{
+				"linux"		"197"
+				"windows"	"196"
 			}
 			"CEconEntity::TranslateViewmodelHandActivityInternal"
 			{
@@ -630,6 +702,34 @@
 					"nTeam"
 					{
 						"type"	"int"
+					}
+				}
+			}
+			"CTFPlayer::PickupWeaponFromOther"
+			{
+				"signature"	"CTFPlayer::PickupWeaponFromOther"
+				"callconv"	"thiscall"
+				"return"	"bool"
+				"this"		"entity"
+				"arguments"
+				{
+					"CTFDroppedWeapon"
+					{
+						"type"  "cbaseentity"
+					}
+				}
+			}
+			"CTFPlayer::CanPickupDroppedWeapon"
+			{
+				"signature"	"CTFPlayer::CanPickupDroppedWeapon"
+				"callconv"	"thiscall"
+				"return"	"bool"
+				"this"		"entity"
+				"arguments"
+				{
+					"CTFDroppedWeapon"
+					{
+						"type"  "cbaseentity"
 					}
 				}
 			}

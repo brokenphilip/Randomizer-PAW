@@ -65,6 +65,8 @@ public void DHook_Init(GameData hGameData)
 	DHook_CreateDetour(hGameData, "CTFPlayer::CheckBlockBackstab", DHook_CheckBlockBackstabPre, _);
 	DHook_CreateDetour(hGameData, "CTFPlayer::CanPickupBuilding", _, DHook_CanPickupBuildingPost);
 	DHook_CreateDetour(hGameData, "CTFPlayer::DropRune", DHook_DropRunePre, _);
+	DHook_CreateDetour(hGameData, "CTFPlayer::CanPickupDroppedWeapon", DHook_CanPickupDroppedWeaponPre, _);
+	DHook_CreateDetour(hGameData, "CTFPlayer::PickupWeaponFromOther", _, DHook_PickupWeaponFromOtherPost);
 	DHook_CreateDetour(hGameData, "CTFPlayerClassShared::CanBuildObject", DHook_CanBuildObjectPre, _);
 	DHook_CreateDetour(hGameData, "CEconEntity::UpdateModelToClass", DHook_UpdateModelToClassPre, _);
 	DHook_CreateDetour(hGameData, "CTFKnife::DisguiseOnKill", DHook_DisguiseOnKillPre, DHook_DisguiseOnKillPost);
@@ -1246,5 +1248,117 @@ public MRESReturn DHook_FrameUpdatePostEntityThinkPre()
 public MRESReturn DHook_FrameUpdatePostEntityThinkPost()
 {
 	Patch_DisableIsPlayerClass();
+	return MRES_Ignored;
+}
+
+public MRESReturn DHook_CanPickupDroppedWeaponPre(int iClient, DHookReturn hReturn, DHookParam hParams)
+{
+	if (!g_cvPickupAnyWeapon.BoolValue)
+		return MRES_Ignored;
+
+	// Can't pick the weapon up if its item information is invalid
+	// todo?
+	
+	// Can't pick the weapon up if the player is a Spy AND either disguised or invisible (awful, thanks valve)
+	// todo?
+
+	// Can't pick the weapon up if the player is dead or taunting
+	// todo?
+
+	// Can't pick the weapon up if the player doesn't have an active weapon (????)
+	// todo?
+
+	// Normally, you can't pick the weapon up if the weapon slot the weapon is meant for is empty
+	// This is because you'd have no weapon to drop. Redundant check it seems, but alas...
+	// Since in PWFO we don't drop weapons we don't own anyways, we can skip this check
+	// You also can't pick up weapons that aren't meant for your class, which is a check we're obviously skipping lol
+
+	hReturn.Value = true;
+	return MRES_Supercede;
+}
+
+public MRESReturn DHook_PickupWeaponFromOtherPost(int iClient, DHookReturn hReturn, DHookParam hParams)
+{
+	if (!g_cvPickupAnyWeapon.BoolValue)
+		return MRES_Ignored;
+
+	// !!!!! for some reason, every second unsuccessful pickup seems to return true
+	// note that this bypasses the no sappers/toolboxes check below
+	// for example, if i try to pick up a sapper as pyro it will block it
+	// but, if i pick up, say, a revolver, then a sapper, my game crashes (hReturn.Value was 1 !!!)
+
+	// Pickup was unsuccessful for whatever reason
+	// Create a new weapon manually and drop the old one if needed
+	if (!hReturn.Value)
+	{
+		int iDroppedWeapon = hParams.Get(1);
+		Address pItem = GetEntityAddress(iDroppedWeapon) + view_as<Address>(g_iOffsetDroppedItem);
+		int iIndex = LoadFromAddress(pItem + view_as<Address>(g_iOffsetItemDefinitionIndex), NumberType_Int16);
+
+		char sClassname[256];
+		TF2Econ_GetItemClassName(iIndex, sClassname, sizeof(sClassname));
+
+		// Builder/Sapper do not equip properly, often crashing the server or the client. Might be CHudHistoryResource related?
+		if (StrEqual(sClassname, "tf_weapon_builder", false) || StrEqual(sClassname, "tf_weapon_sapper", false))
+		{
+			PrintToChat(iClient, "Picking up Toolboxes and Sappers is currently unsupported.");
+			return MRES_Ignored;
+		}
+
+		// Make a new weapon based off the one we just picked up
+		int iNewWeapon = TF2_GiveNamedItem(iClient, pItem);
+
+		// Weapon creation failed for whatever reason, bail
+		if (iNewWeapon == INVALID_ENT_REFERENCE)
+			return MRES_Ignored;
+
+		int iSlot = TF2_GetSlot(iNewWeapon);
+		int iCurrentWeapon = GetPlayerWeaponSlot(iClient, iSlot);
+
+		// We don't want players to have multiple weapons on one slot
+		// If we have a weapon in the target slot, drop it and then remove it first. If not, just equip the new weapon immediately
+		if (iCurrentWeapon != INVALID_ENT_REFERENCE)
+		{
+			float vecOrigin[3], vecAngles[3] = {0.0, 0.0, 0.0};
+			GetClientAbsOrigin(iClient, vecOrigin);	
+			
+			SDKCall_CalculatePosAng(iClient, iCurrentWeapon, vecOrigin, vecAngles);
+
+			TF2_CreateDroppedWeapon(iCurrentWeapon, iClient, vecOrigin, vecAngles);
+			TF2_RemoveItem(iClient, iCurrentWeapon);
+		}
+
+		// Equip new weapon and finalize pickup procedure
+		TF2_EquipWeapon(iClient, iNewWeapon);
+		SDKCall_InitPickedUpWeapon(iDroppedWeapon, iClient, iNewWeapon);
+		AcceptEntityInput(iDroppedWeapon, "Kill");
+
+		//Fill charge meter
+		/*if (!TF2Attrib_HookValueFloat(0.0, "item_meter_resupply_denied", iNewWeapon))
+			Properties_AddWeaponChargeMeter(iClient, iNewWeapon, SDKCall_GetDefaultCharge(iNewWeapon));*/
+		Properties_AddWeaponChargeMeter(iClient, iNewWeapon, SDKCall_GetDefaultCharge(iNewWeapon));
+
+		//Fill ammo
+		/*if (HasEntProp(iNewWeapon, Prop_Send, "m_iPrimaryAmmoType"))
+		{
+			int iAmmoType = GetEntProp(iNewWeapon, Prop_Send, "m_iPrimaryAmmoType");
+			if (iAmmoType != -1)
+			{
+				int iMaxAmmo = TF2_GetMaxAmmo(iClient, iNewWeapon, iAmmoType);
+				int iAmmo = TF2_GiveAmmo(iClient, iNewWeapon, 0, iMaxAmmo, iAmmoType, true, kAmmoSource_Pickup);
+
+				Properties_SetWeaponPropInt(iNewWeapon, "m_iAmmo", iAmmo);
+				if (iNewWeapon == GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon"))
+					Properties_UpdateActiveWeaponAmmo(iClient);
+			}
+		}
+
+		SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", SDKCall_GetDefaultCharge(iNewWeapon), iSlot);
+			*/
+			
+		return MRES_Handled;
+	}
+
+	// Otherwise, if pickup was already successful, no need to do anything
 	return MRES_Ignored;
 }

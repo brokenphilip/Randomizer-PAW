@@ -15,6 +15,11 @@ static Handle g_hSDKGetMaxHealth;
 static Handle g_hSDKWeaponCanSwitchTo;
 static Handle g_hSDKEquipWearable;
 static Handle g_hSDKGiveNamedItem;
+static Handle g_hSDKCreateDroppedWeapon
+static Handle g_hSDKInitDroppedWeapon
+static Handle g_hSDKCalculatePosAng;
+static Handle g_hSDKGetDefaultCharge;
+static Handle g_hSDKInitPickedUpWeapon;
 
 public void SDKCall_Init(GameData hGameData)
 {
@@ -150,6 +155,53 @@ public void SDKCall_Init(GameData hGameData)
 	g_hSDKGiveNamedItem = EndPrepSDKCall();
 	if (!g_hSDKGiveNamedItem)
 		LogError("Failed to create call: CTFPlayer::GiveNamedItem");
+
+	StartPrepSDKCall(SDKCall_Static);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTFDroppedWeapon::Create");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
+	PrepSDKCall_AddParameter(SDKType_QAngle, SDKPass_ByRef);
+	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
+	g_hSDKCreateDroppedWeapon = EndPrepSDKCall();
+	if (!g_hSDKCreateDroppedWeapon)
+		LogError("Failed to create call: CTFDroppedWeapon::Create");
+
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTFDroppedWeapon::InitDroppedWeapon");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	g_hSDKInitDroppedWeapon = EndPrepSDKCall();
+	if (!g_hSDKInitDroppedWeapon)
+		LogError("Failed to create call: CTFDroppedWeapon::InitDroppedWeapon");
+
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTFPlayer::CalculateAmmoPackPositionAndAngles");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef, _, VENCODE_FLAG_COPYBACK);
+	PrepSDKCall_AddParameter(SDKType_QAngle, SDKPass_ByRef, _, VENCODE_FLAG_COPYBACK);
+	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
+	g_hSDKCalculatePosAng = EndPrepSDKCall();
+	if (!g_hSDKCalculatePosAng)
+		LogError("Failed to create call: CTFPlayer::CalculateAmmoPackPositionAndAngles");
+
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, "CBaseEntity::GetDefaultItemChargeMeterValue");
+	PrepSDKCall_SetReturnInfo(SDKType_Float, SDKPass_Plain);
+	g_hSDKGetDefaultCharge = EndPrepSDKCall();
+	if (!g_hSDKGetDefaultCharge)
+		LogError("Failed to create call: CBaseEntity::GetDefaultItemChargeMeterValue");
+
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTFDroppedWeapon::InitPickedUpWeapon");
+	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	g_hSDKInitPickedUpWeapon = EndPrepSDKCall();
+	if (!g_hSDKInitPickedUpWeapon)
+		LogError("Failed to create call: CTFDroppedWeapon::InitPickedUpWeapon");
 }
 
 int SDKCall_GetMaxAmmo(int iClient, int iAmmoType, TFClassType nClass = view_as<TFClassType>(-1))
@@ -235,4 +287,29 @@ void SDKCall_EquipWearable(int iClient, int iWearable)
 int SDKCall_GiveNamedItem(int iClient, const char[] sClassname, int iSubType, Address pItem, bool b = false)
 {
 	return SDKCall(g_hSDKGiveNamedItem, iClient, sClassname, iSubType, pItem, b);
+}
+
+int SDKCall_CreateDroppedWeapon(int iClient, const float vecOrigin[3], const float vecAngles[3], const char[] sModelName, Address pItem)
+{
+	return SDKCall(g_hSDKCreateDroppedWeapon, iClient, vecOrigin, vecAngles, sModelName, pItem);
+}
+
+int SDKCall_InitDroppedWeapon(int iCreatedWeapon, int iClient, int iSourceWeapon, bool bSwap, bool bIsSuicide)
+{
+	return SDKCall(g_hSDKInitDroppedWeapon, iCreatedWeapon, iClient, iSourceWeapon, bSwap, bIsSuicide);
+}
+
+bool SDKCall_CalculatePosAng(int iClient, int iWeapon, float vecOrigin[3], float vecAngles[3])
+{
+	return SDKCall(g_hSDKCalculatePosAng, iClient, iWeapon, vecOrigin, vecAngles);
+}
+
+float SDKCall_GetDefaultCharge(int iWeapon)
+{
+	return SDKCall(g_hSDKGetDefaultCharge, iWeapon);
+}
+
+void SDKCall_InitPickedUpWeapon(int iDroppedWeapon, int iClient, int iWeapon)
+{
+	SDKCall(g_hSDKInitPickedUpWeapon, iDroppedWeapon, iClient, iWeapon);
 }

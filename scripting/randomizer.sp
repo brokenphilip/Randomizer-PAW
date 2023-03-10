@@ -17,6 +17,7 @@
 
 #define PLUGIN_VERSION			"1.10.1"
 #define PLUGIN_VERSION_REVISION	"manual"
+#define PLUGIN_VERSION_PAW		"1.0"
 
 #define TF_MAXPLAYERS	34	//32 clients + 1 for 0/world/console + 1 for replay/SourceTV
 #define CONFIG_MAXCHAR	64
@@ -327,12 +328,14 @@ int g_iOffsetItem;
 int g_iOffsetItemDefinitionIndex;
 int g_iOffsetMyWearables;
 int g_iOffsetPlayerShared;
+int g_iOffsetDroppedItem;
 int g_iOffsetAlwaysAllow;
 
 ConVar g_cvEnabled;
 ConVar g_cvFixTaunt;
 ConVar g_cvDroppedWeapons;
 ConVar g_cvHuds;
+ConVar g_cvPickupAnyWeapon;
 ConVar g_cvRandomize[view_as<int>(RandomizedType_MAX)];
 
 bool g_bClientRefresh[TF_MAXPLAYERS];
@@ -370,11 +373,11 @@ ArrayList g_aEntityToRemove;
 
 public Plugin myinfo =
 {
-	name = "Randomizer",
-	author = "42",
+	name = "Randomizer (PAW)",
+	author = "42 (brokenphilip)",
 	description = "Gamemode where everyone plays as random class with random weapons",
-	version = PLUGIN_VERSION ... "." ... PLUGIN_VERSION_REVISION,
-	url = "https://github.com/FortyTwoFortyTwo/Randomizer",
+	version = PLUGIN_VERSION ... "." ... PLUGIN_VERSION_REVISION ... "(" ... PLUGIN_VERSION_PAW ... ")",
+	url = "https://github.com/brokenphilip/Randomizer-PAW",
 };
 
 public void OnPluginStart()
@@ -400,6 +403,9 @@ public void OnPluginStart()
 	g_iOffsetItemDefinitionIndex = FindSendPropInfo("CTFWearable", "m_iItemDefinitionIndex") - g_iOffsetItem;
 	g_iOffsetMyWearables = FindSendPropInfo("CTFPlayer", "m_hMyWearables");
 	g_iOffsetPlayerShared = FindSendPropInfo("CTFPlayer", "m_Shared");
+
+	//Offset not identical to above
+	g_iOffsetDroppedItem = FindSendPropInfo("CTFDroppedWeapon", "m_Item");
 	
 	/* This is an ugly way to get offset, but atleast it should almost never break from tf2 updates,
 	 * tf2 updating offset before all of this wouldn't break, and reports error if tf2 ever somehow broke it.

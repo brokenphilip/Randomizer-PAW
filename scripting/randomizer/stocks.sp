@@ -78,6 +78,12 @@ stock int TF2_GiveNamedItem(int iClient, Address pItem, int iSlot = -1)
 	TF2Econ_GetItemClassName(iIndex, sClassname, sizeof(sClassname));
 	TF2Econ_TranslateWeaponEntForClass(sClassname, sizeof(sClassname), nClass);
 	
+	// PAW HACK: tf_weapon_shotgun is a catch-all and doesn't actually exist as a weapon
+	// For no specific reason whatsoever, force it to behave like Engi's shotgun in particular
+	// Note that classname gets translated again in GiveNamedItem, so Soldier/Pyro/Heavy will not have two shotguns
+	if (StrContains(sClassname, "tf_weapon_shotgun", false) == 0)
+		strcopy(sClassname, sizeof(sClassname), "tf_weapon_shotgun_primary");
+
 	int iSubType = 0;
 	if (TF2Econ_GetItemLoadoutSlot(iIndex, TFClass_Spy) == LoadoutSlot_Building)
 		iSubType = view_as<int>(TFObject_Sapper);
@@ -85,7 +91,7 @@ stock int TF2_GiveNamedItem(int iClient, Address pItem, int iSlot = -1)
 	g_bAllowGiveNamedItem = true;
 	int iWeapon = SDKCall_GiveNamedItem(iClient, sClassname, iSubType, pItem, true);
 	g_bAllowGiveNamedItem = false;
-	
+
 	if (TF2Econ_GetItemLoadoutSlot(iIndex, TFClass_Engineer) == LoadoutSlot_Building)
 	{
 		SetEntProp(iWeapon, Prop_Send, "m_aBuildableObjectTypes", true, _, view_as<int>(TFObject_Dispenser));
@@ -476,7 +482,7 @@ stock void TF2_RemoveItem(int iClient, int iWeapon)
 		TF2_RemoveWearable(iClient, iWeapon);
 		return;
 	}
-	
+
 	//Below similar to TF2_RemoveWeaponSlot, but only removes 1 weapon instead of all weapons in 1 slot
 	
 	int iExtraWearable = GetEntPropEnt(iWeapon, Prop_Send, "m_hExtraWearable");
@@ -530,6 +536,19 @@ stock int TF2_SpawnParticle(const char[] sParticle, int iEntity)
 	
 	//Return ref of entity
 	return EntIndexToEntRef(iParticle);
+}
+
+stock int TF2_CreateDroppedWeapon(int iSourceWeapon, int iClient, const float vecOrigin[3], const float vecAngles[3])
+{
+	// Can't get model directly. Instead get index and look it up in string table.
+	char sModelName[PLATFORM_MAX_PATH];
+	GetEntityModel(iSourceWeapon, sModelName, sizeof(sModelName), "m_iWorldModelIndex");
+	
+	int iCreatedWeapon = SDKCall_CreateDroppedWeapon(iClient, vecOrigin, vecAngles, sModelName, GetEntityAddress(iSourceWeapon) + view_as<Address>(g_iOffsetItem));
+	if (iCreatedWeapon != INVALID_ENT_REFERENCE)
+		SDKCall_InitDroppedWeapon(iCreatedWeapon, iClient, iSourceWeapon, true, false);
+
+	return iCreatedWeapon;
 }
 
 stock float min(float a, float b)

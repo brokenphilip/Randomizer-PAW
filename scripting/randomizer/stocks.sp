@@ -551,6 +551,13 @@ stock int TF2_CreateDroppedWeapon(int iSourceWeapon, int iClient, const float ve
 	return iCreatedWeapon;
 }
 
+stock float TF2_GetPercentInvisible(int client)
+{
+    static int offset;
+    offset = FindSendPropInfo("CTFPlayer", "m_flInvisChangeCompleteTime") - 8;
+    return GetEntDataFloat(client, offset);
+}
+
 stock float min(float a, float b)
 {
 	return a < b ? a : b;

@@ -1256,22 +1256,32 @@ public MRESReturn DHook_CanPickupDroppedWeaponPre(int iClient, DHookReturn hRetu
 	if (!g_cvPickupAnyWeapon.BoolValue)
 		return MRES_Ignored;
 
+	int iWeapon = hParams.Get(1);
+
 	// Can't pick the weapon up if its item information is invalid
-	// todo?
+	bool bIsValid = GetEntProp(iWeapon, Prop_Send, "m_bInitialized") == 1;
 	
 	// Can't pick the weapon up if the player is a Spy AND either disguised or invisible (awful, thanks valve)
-	// todo?
+	bool bIsDisguisedOrInvisSpy = TF2_GetPlayerClass(iClient) == TFClass_Spy && (TF2_IsPlayerInCondition(iClient, TFCond_Disguised) || TF2_GetPercentInvisible(iClient) > 0);
 
 	// Can't pick the weapon up if the player is dead or taunting
-	// todo?
+	bool bIsDeadOrTaunting = !IsPlayerAlive(iClient) || TF2_IsPlayerInCondition(iClient, TFCond_Taunting);
 
-	// Can't pick the weapon up if the player doesn't have an active weapon (????)
-	// todo?
+	// Can't pick the weapon up if the player doesn't have an active weapon (why????)
+	// todo? (skipping this probably, doesn't seem to affect anything)
 
 	// Normally, you can't pick the weapon up if the weapon slot the weapon is meant for is empty
 	// This is because you'd have no weapon to drop. Redundant check it seems, but alas...
 	// Since in PWFO we don't drop weapons we don't own anyways, we can skip this check
+
 	// You also can't pick up weapons that aren't meant for your class, which is a check we're obviously skipping lol
+
+	// Combine all the above checks
+	if (!bIsValid || bIsDisguisedOrInvisSpy || bIsDeadOrTaunting)
+	{
+		hReturn.Value = false;
+		return MRES_Supercede;
+	}
 
 	hReturn.Value = true;
 	return MRES_Supercede;
@@ -1333,10 +1343,17 @@ public MRESReturn DHook_PickupWeaponFromOtherPost(int iClient, DHookReturn hRetu
 		SDKCall_InitPickedUpWeapon(iDroppedWeapon, iClient, iNewWeapon);
 		AcceptEntityInput(iDroppedWeapon, "Kill");
 
+		// !!! these below will refill everything (ammo, charge, etc...) when the weapon is picked up
+		// easily abusable to get practically infinite reserve ammo by weapon switching
+		// initpickedupweapon should have already transferred over everything (ammo, charge, etc...), but it doesn't work for some reason, needs more testing
+		// might even need to do it manually at this point
+
+		// todo: is a sdkcall for getdefaultcharge even necessary? plugin hardcodes 100.0, plus i ideally want to take it from the picked up weapon
+		// todo: not sure where else to put this, but weapons don't drop on resupply touch, need to investigate (maybe properties/loadout.sp?)
+
 		//Fill charge meter
 		/*if (!TF2Attrib_HookValueFloat(0.0, "item_meter_resupply_denied", iNewWeapon))
 			Properties_AddWeaponChargeMeter(iClient, iNewWeapon, SDKCall_GetDefaultCharge(iNewWeapon));*/
-		Properties_AddWeaponChargeMeter(iClient, iNewWeapon, SDKCall_GetDefaultCharge(iNewWeapon));
 
 		//Fill ammo
 		/*if (HasEntProp(iNewWeapon, Prop_Send, "m_iPrimaryAmmoType"))
@@ -1351,10 +1368,9 @@ public MRESReturn DHook_PickupWeaponFromOtherPost(int iClient, DHookReturn hRetu
 				if (iNewWeapon == GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon"))
 					Properties_UpdateActiveWeaponAmmo(iClient);
 			}
-		}
+		}*/
 
-		SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", SDKCall_GetDefaultCharge(iNewWeapon), iSlot);
-			*/
+		//SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", SDKCall_GetDefaultCharge(iNewWeapon), iSlot);
 			
 		return MRES_Handled;
 	}

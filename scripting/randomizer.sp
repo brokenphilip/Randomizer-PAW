@@ -376,7 +376,7 @@ public Plugin myinfo =
 	name = "Randomizer (PAW)",
 	author = "42 (brokenphilip)",
 	description = "Gamemode where everyone plays as random class with random weapons",
-	version = PLUGIN_VERSION ... "." ... PLUGIN_VERSION_REVISION ... "(" ... PLUGIN_VERSION_PAW ... ")",
+	version = PLUGIN_VERSION ... "." ... PLUGIN_VERSION_REVISION ... " (paw" ... PLUGIN_VERSION_PAW ... ")",
 	url = "https://github.com/brokenphilip/Randomizer-PAW",
 };
 

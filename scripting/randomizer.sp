@@ -15,7 +15,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION			"1.10.1"
+#define PLUGIN_VERSION			"1.10.2"
 #define PLUGIN_VERSION_REVISION	"manual"
 #define PLUGIN_VERSION_PAW		"0.2"
 

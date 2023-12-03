@@ -339,13 +339,14 @@ ConVar g_cvRandomize[view_as<int>(RandomizedType_MAX)];
 
 bool g_bClientRefresh[MAXPLAYERS];
 
-TFClassType g_iClientCurrentClass[MAXPLAYERS];
+TFClassType g_iClientCurrentClass[MAXPLAYERS][4];
 bool g_bFeignDeath[MAXPLAYERS];
 int g_iHypeMeterLoaded[MAXPLAYERS] = {INVALID_ENT_REFERENCE, ...};
 bool g_bWeaponDecap[MAXPLAYERS];
 Handle g_hTimerClientHud[MAXPLAYERS];
 
 bool g_bOnTakeDamage;
+bool g_bOnTakeDamageClass;
 int g_iGainingRageWeapon = INVALID_ENT_REFERENCE;
 int g_iTouchItem = INVALID_ENT_REFERENCE;
 int g_iTouchToucher = INVALID_ENT_REFERENCE;
@@ -509,7 +510,7 @@ public void OnGameFrame()
 		if (IsClientInGame(iClient))
 		{
 			//Create a weapon every frame instead of all at once in 1 frame
-			if (!bWeaponCreated)
+			if (!bWeaponCreated && TF2_GetPlayerClass(iClient) != TFClass_Unknown)
 			{
 				TFClassType nClass = Loadout_GetClientClass(iClient);
 				ArrayList aWeapons = Loadout_GetClientWeapons(iClient, nClass);
@@ -871,19 +872,47 @@ KeyValues LoadConfig(const char[] sFilepath, const char[] sName)
 
 void SetClientClass(int iClient, TFClassType nClass)
 {
-	if (g_iClientCurrentClass[iClient] == TFClass_Unknown)
-		g_iClientCurrentClass[iClient] = TF2_GetPlayerClass(iClient);
+	if (nClass == TFClass_Unknown)
+		ThrowError("Got TFClass_Unknown in SetClientClass");
 	
-	TF2_SetPlayerClass(iClient, nClass);
+	for (int i = 0; i < sizeof(g_iClientCurrentClass[]); i++)
+	{
+		if (g_iClientCurrentClass[iClient][i] != TFClass_Unknown)
+			continue;
+		
+		g_iClientCurrentClass[iClient][i] = TF2_GetPlayerClass(iClient);
+		if (g_iClientCurrentClass[iClient][i] == TFClass_Unknown)
+			ThrowError("Client %d is TFClass_Unknown in SetClientClass", iClient);
+		
+		TF2_SetPlayerClass(iClient, nClass);
+		return;
+	}
+	
+	ThrowError("Exceeded array limit on storing class");
+}
+
+void SetClientClassOriginal(int iClient)
+{
+	TFClassType nClass = g_iClientCurrentClass[iClient][0];
+	if (nClass == TFClass_Unknown)
+		nClass = TF2_GetPlayerClass(iClient);
+	
+	SetClientClass(iClient, nClass);
 }
 
 void RevertClientClass(int iClient)
 {
-	if (g_iClientCurrentClass[iClient] != TFClass_Unknown)
+	for (int i = sizeof(g_iClientCurrentClass[]) - 1; i >= 0; i--)
 	{
-		TF2_SetPlayerClass(iClient, g_iClientCurrentClass[iClient]);
-		g_iClientCurrentClass[iClient] = TFClass_Unknown;
+		if (g_iClientCurrentClass[iClient][i] == TFClass_Unknown)
+			continue;
+		
+		TF2_SetPlayerClass(iClient, g_iClientCurrentClass[iClient][i]);
+		g_iClientCurrentClass[iClient][i] = TFClass_Unknown;
+		return;
 	}
+	
+	ThrowError("Could not find class to revert back to");
 }
 
 public Action TF2Items_OnGiveNamedItem(int iClient, char[] sClassname, int iIndex, Handle &hItem)

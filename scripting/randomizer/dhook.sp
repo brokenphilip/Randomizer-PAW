@@ -45,6 +45,7 @@ static int g_iDHookGamerulesPre;
 static int g_iDHookGamerulesPost;
 
 static bool g_bDoClassSpecialSkill[MAXPLAYERS];
+static bool g_bDoClassSpecialSkillClass[MAXPLAYERS];
 static bool g_bApplyBiteEffectsChocolate[MAXPLAYERS];
 
 public void DHook_Init(GameData hGameData)
@@ -359,13 +360,10 @@ public MRESReturn DHook_TauntPre(int iClient, DHookParam hParams)
 	//Player wants to taunt, set class to whoever can actually taunt with active weapon
 	
 	int iWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
-	if (iWeapon <= MaxClients)
+	if (iWeapon == INVALID_ENT_REFERENCE)
 		return MRES_Ignored;
 	
-	TFClassType nClass = TF2_GetDefaultClassFromItem(iWeapon);
-	if (nClass != TFClass_Unknown)
-		SetClientClass(iClient, nClass);
-	
+	SetClientClass(iClient, TF2_GetDefaultClassFromItem(iWeapon));
 	return MRES_Ignored;
 }
 
@@ -374,6 +372,10 @@ public MRESReturn DHook_TauntPost(int iClient, DHookParam hParams)
 	if (!g_cvFixTaunt.BoolValue)
 		return MRES_Ignored;
 
+	int iWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
+	if (iWeapon == INVALID_ENT_REFERENCE)
+		return MRES_Ignored;
+	
 	//Set class back to what it was
 	RevertClientClass(iClient);
 	return MRES_Ignored;
@@ -462,7 +464,7 @@ public MRESReturn DHook_DoClassSpecialSkillPre(int iClient, DHookReturn hReturn)
 	//If Engineer, pickup buildings
 	//If Spy, cloak or uncloak
 	
-	g_bDoClassSpecialSkill[iClient] = true;
+	g_bDoClassSpecialSkill[iClient] = true;	// To stop DHook_SecondaryWeaponPost from calling this again
 	int iActiveWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 	if (iActiveWeapon == INVALID_ENT_REFERENCE)
 		return MRES_Ignored;
@@ -478,6 +480,7 @@ public MRESReturn DHook_DoClassSpecialSkillPre(int iClient, DHookReturn hReturn)
 		int iButton = Controls_GetPassiveButtonBit(iClient, iWeapon);
 		if (iButton > 0 && iButtons & iButton)
 		{
+			g_bDoClassSpecialSkillClass[iClient] = true;
 			Controls_OnPassiveUse(iClient, iWeapon);
 			SetClientClass(iClient, TF2_GetDefaultClassFromItem(iWeapon));
 			return MRES_Ignored;
@@ -491,7 +494,12 @@ public MRESReturn DHook_DoClassSpecialSkillPre(int iClient, DHookReturn hReturn)
 
 public MRESReturn DHook_DoClassSpecialSkillPost(int iClient, DHookReturn hReturn)
 {
-	RevertClientClass(iClient);
+	if (g_bDoClassSpecialSkillClass[iClient])
+	{
+		RevertClientClass(iClient);
+		g_bDoClassSpecialSkillClass[iClient] = false;
+	}
+	
 	return MRES_Ignored;
 }
 
@@ -552,6 +560,10 @@ public MRESReturn DHook_CalculateMaxSpeedPre(int iClient, DHookReturn hReturn, D
 	if (!IsClientInGame(iClient))	//IsClientInGame check is needed, weird game
 		return MRES_Ignored;
 	
+	// Eyelander kill causing client to be at same speed as Demoman
+	if (TF2_GetPlayerClass(iClient) != TFClass_Unknown)
+		SetClientClassOriginal(iClient);
+	
 	int iWeapon, iPos;
 	
 	//Set hype to any baby face blaster, all should have same value
@@ -579,6 +591,9 @@ public MRESReturn DHook_CalculateMaxSpeedPost(int iClient, DHookReturn hReturn, 
 	//Set back to active weapon
 	if (!g_bWeaponDecap[iClient])
 		Properties_LoadActiveWeaponPropInt(iClient, "m_iDecapitations");
+	
+	if (TF2_GetPlayerClass(iClient) != TFClass_Unknown)
+		RevertClientClass(iClient);
 	
 	return MRES_Ignored;
 }
@@ -1141,12 +1156,7 @@ public MRESReturn DHook_InitClassPost(int iClient)
 public MRESReturn DHook_TakeHealthPre(int iClient, DHookReturn hReturn, DHookParam hParams)
 {
 	// We dont want randomizer's class changes with different max health to affect here
-	if (g_iClientCurrentClass[iClient] != TFClass_Unknown && TF2_GetPlayerClass(iClient) != TFClass_Unknown)
-	{
-		TFClassType iClass = g_iClientCurrentClass[iClient];
-		g_iClientCurrentClass[iClient] = TF2_GetPlayerClass(iClient);
-		TF2_SetPlayerClass(iClient, iClass);
-	}
+	SetClientClassOriginal(iClient);
 	
 	if (g_bApplyBiteEffectsChocolate[iClient]) 
 	{
@@ -1159,13 +1169,7 @@ public MRESReturn DHook_TakeHealthPre(int iClient, DHookReturn hReturn, DHookPar
 
 public MRESReturn DHook_TakeHealthPost(int iClient, DHookReturn hReturn, DHookParam hParams)
 {
-	if (g_iClientCurrentClass[iClient] != TFClass_Unknown && TF2_GetPlayerClass(iClient) != TFClass_Unknown)
-	{
-		TFClassType iClass = g_iClientCurrentClass[iClient];
-		g_iClientCurrentClass[iClient] = TF2_GetPlayerClass(iClient);
-		TF2_SetPlayerClass(iClient, iClass);
-	}
-	
+	RevertClientClass(iClient);
 	return MRES_Ignored;
 }
 
